@@ -15,58 +15,30 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Generate Project & Compile APK
+      - name: Compile APK Directly with Android SDK Tools
         shell: python3 {0}
         run: |
-          import os, subprocess
+          import os, glob, subprocess
 
-          files = {}
+          sdk = os.environ.get("ANDROID_HOME") or "/usr/local/lib/android/sdk"
+          build_tools = sorted(glob.glob(f"{sdk}/build-tools/*"))[-1]
+          platform_jar = sorted(glob.glob(f"{sdk}/platforms/android-*/android.jar"))[-1]
+          print("Using Build Tools:", build_tools)
+          print("Using Platform:", platform_jar)
 
-          files["settings.gradle"] = '''rootProject.name = "DrinkItFool"
-          include ':app'
-          '''
+          os.makedirs("src/com/cute/waterwidget", exist_ok=True)
+          os.makedirs("res/layout", exist_ok=True)
+          os.makedirs("res/xml", exist_ok=True)
+          os.makedirs("build/gen", exist_ok=True)
+          os.makedirs("build/obj", exist_ok=True)
+          os.makedirs("build/apk", exist_ok=True)
 
-          files["build.gradle"] = '''buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies {
-                  classpath "com.android.tools.build:gradle:8.2.0"
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20"
-              }
-          }
-          allprojects {
-              repositories { google(); mavenCentral() }
-          }
-          '''
-
-          files["gradle.properties"] = '''android.useAndroidX=true
-          org.gradle.jvmargs=-Xmx2048m
-          '''
-
-          files["app/build.gradle"] = '''apply plugin: 'com.android.application'
-          apply plugin: 'kotlin-android'
-
-          android {
-              namespace 'com.cute.waterwidget'
-              compileSdk 34
-              defaultConfig {
-                  applicationId "com.cute.waterwidget"
-                  minSdk 26
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
-              }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              kotlinOptions { jvmTarget = '17' }
-          }
-          dependencies {
-              implementation 'androidx.core:core-ktx:1.12.0'
-          }
-          '''
-
-          files["app/src/main/AndroidManifest.xml"] = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          manifest = """<?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.cute.waterwidget"
+              android:versionCode="1"
+              android:versionName="1.0">
+              <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.VIBRATE"/>
               <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
@@ -74,14 +46,12 @@ jobs:
                   android:label="Drink It, Fool!"
                   android:icon="@android:drawable/ic_menu_compass"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-                  
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-
                   <receiver android:name=".WaterWidgetProvider" android:exported="true" android:label="Drink It, Fool! 3D Glass">
                       <intent-filter>
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
@@ -95,19 +65,19 @@ jobs:
                           android:resource="@xml/widget_info"/>
                   </receiver>
               </application>
-          </manifest>
-          '''
+          </manifest>"""
 
-          files["app/src/main/res/xml/widget_info.xml"] = '''<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+          widget_info = """<?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
               android:minWidth="180dp"
               android:minHeight="180dp"
               android:updatePeriodMillis="1800000"
               android:initialLayout="@layout/widget_layout"
               android:resizeMode="horizontal|vertical"
-              android:widgetCategory="home_screen"/>
-          '''
+              android:widgetCategory="home_screen"/>"""
 
-          files["app/src/main/res/layout/widget_layout.xml"] = '''<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          widget_layout = """<?xml version="1.0" encoding="utf-8"?>
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:padding="4dp">
@@ -123,275 +93,279 @@ jobs:
                   android:layout_alignParentTop="true"
                   android:layout_alignParentEnd="true"
                   android:background="@android:color/transparent"/>
-          </RelativeLayout>
-          '''
+          </RelativeLayout>"""
 
-          files["app/src/main/java/com/cute/waterwidget/MainActivity.kt"] = '''package com.cute.waterwidget
-          import android.app.Activity
-          import android.os.Build
-          import android.os.Bundle
-          import android.widget.*
-          import android.view.Gravity
-          import android.graphics.Color
+          main_java = """package com.cute.waterwidget;
+          import android.app.Activity;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import android.view.Gravity;
+          import android.graphics.Color;
 
-          class MainActivity : Activity() {
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
+          public class MainActivity extends Activity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
                   if (Build.VERSION.SDK_INT >= 33) {
-                      requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 101)
+                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 101);
                   }
-                  val layout = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      gravity = Gravity.CENTER
-                      setBackgroundColor(Color.parseColor("#0F172A"))
-                      setPadding(65, 65, 65, 65)
-                  }
-                  val tv = TextView(this).apply {
-                      text = "🦆 Drink It, Fool! is Ready!\\n\\n✨ Sounds & Haptics Active!\\n\\n1. Go to your Home Screen\\n2. Long-press your wallpaper -> Widgets\\n3. Drag 'Drink It, Fool!' to your screen!\\n\\n• Tap the glass for a splash sound + ice clink vibration!\\n• Tap the top-right corner of the widget to swap buddies (Duck 🦆, Axolotl 🦎, Frog 🐸, Boba 🧋)!\\n• Automatically wipes at 12:00 AM!"
-                      textSize = 17f
-                      setTextColor(Color.WHITE)
-                      gravity = Gravity.CENTER
-                  }
-                  layout.addView(tv)
-                  setContentView(layout)
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setGravity(Gravity.CENTER);
+                  layout.setBackgroundColor(Color.parseColor("#0F172A"));
+                  layout.setPadding(65, 65, 65, 65);
+
+                  TextView tv = new TextView(this);
+                  tv.setText("🦆 Drink It, Fool! is Ready!\\n\\n✨ Sounds & Haptics Active!\\n\\n1. Go to your Home Screen\\n2. Long-press wallpaper -> Widgets\\n3. Drag 'Drink It, Fool!' to your screen!\\n\\n• Tap the glass for a splash sound + ice clink vibration!\\n• Tap top-right corner of the widget to swap buddies!\\n• Automatically wipes at 12:00 AM!");
+                  tv.setTextSize(17f);
+                  tv.setTextColor(Color.WHITE);
+                  tv.setGravity(Gravity.CENTER);
+                  layout.addView(tv);
+                  setContentView(layout);
               }
-          }
-          '''
+          }"""
 
-          files["app/src/main/java/com/cute/waterwidget/WaterWidgetProvider.kt"] = '''package com.cute.waterwidget
+          provider_java = """package com.cute.waterwidget;
+          import android.app.*;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.*;
+          import android.graphics.*;
+          import android.media.AudioManager;
+          import android.media.ToneGenerator;
+          import android.os.*;
+          import android.widget.RemoteViews;
+          import java.text.SimpleDateFormat;
+          import java.util.*;
 
-          import android.app.*
-          import android.appwidget.AppWidgetManager
-          import android.appwidget.AppWidgetProvider
-          import android.content.*
-          import android.graphics.*
-          import android.media.AudioManager
-          import android.media.ToneGenerator
-          import android.os.*
-          import android.widget.RemoteViews
-          import java.text.SimpleDateFormat
-          import java.util.*
-          import kotlin.random.Random
+          public class WaterWidgetProvider extends AppWidgetProvider {
+              public static final String ACTION_DRINK = "com.cute.waterwidget.ACTION_DRINK";
+              public static final String ACTION_SWITCH_BUDDY = "com.cute.waterwidget.ACTION_SWITCH_BUDDY";
+              public static final String ACTION_REMIND = "com.cute.waterwidget.ACTION_REMIND";
+              public static final String ACTION_MIDNIGHT_WIPE = "com.cute.waterwidget.ACTION_MIDNIGHT_WIPE";
 
-          class WaterWidgetProvider : AppWidgetProvider() {
+              public static final String[] BUDDIES = {"🦆", "🦎", "🐸", "🧋"};
+              public static final String[] GARNISHES = {"🧊", "🍓", "🍋", "🌿", "🍊", "🍒"};
+              public static final String[] REMINDERS = {
+                  "Drink It, Fool! Your glass buddy is touching the bottom—take a sip! 🦆💧",
+                  "Hey fool! Your cells are begging for a splash! It's been 2.5 hours! 🫧",
+                  "Pouty glass alert! ( ；´Д｀) Drop an ice cube and drink some water, fool!"
+              };
 
-              companion object {
-                  const val ACTION_DRINK = "com.cute.waterwidget.ACTION_DRINK"
-                  const val ACTION_SWITCH_BUDDY = "com.cute.waterwidget.ACTION_SWITCH_BUDDY"
-                  const val ACTION_REMIND = "com.cute.waterwidget.ACTION_REMIND"
-                  const val ACTION_MIDNIGHT_WIPE = "com.cute.waterwidget.ACTION_MIDNIGHT_WIPE"
-                  val BUDDIES = listOf("🦆", "🦎", "🐸", "🧋")
-                  val GARNISHES = listOf("🧊", "🍓", "🍋", "🌿", "🍊", "🍒")
-                  val REMINDERS = listOf(
-                      "Drink It, Fool! Your glass buddy is touching the bottom—take a sip! 🦆💧",
-                      "Hey fool! Your cells are begging for a splash! It's been 2.5 hours! 🫧",
-                      "Pouty glass alert! ( ；´Д｀) Drop an ice cube and drink some water, fool!"
-                  )
-              }
-
-              override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-                  scheduleMidnightWipe(context)
-                  for (id in ids) updateWidget(context, manager, id)
+              @Override
+              public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
+                  scheduleMidnightWipe(context);
+                  for (int id : ids) updateWidget(context, manager, id);
               }
 
-              override fun onReceive(context: Context, intent: Intent) {
-                  super.onReceive(context, intent)
-                  val prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE)
-                  val today = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+              @Override
+              public void onReceive(Context context, Intent intent) {
+                  super.onReceive(context, intent);
+                  SharedPreferences prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE);
+                  String today = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+                  String action = intent.getAction();
 
-                  if (prefs.getString("date", "") != today || intent.action == ACTION_MIDNIGHT_WIPE) {
-                      val savedBuddy = prefs.getInt("buddy_idx", 0)
+                  if (!today.equals(prefs.getString("date", "")) || ACTION_MIDNIGHT_WIPE.equals(action)) {
+                      int savedBuddy = prefs.getInt("buddy_idx", 0);
                       prefs.edit().clear()
                           .putString("date", today)
                           .putInt("buddy_idx", savedBuddy)
                           .putBoolean("just_reset", true)
-                          .apply()
+                          .apply();
                   }
 
-                  when (intent.action) {
-                      ACTION_DRINK -> {
-                          val cups = prefs.getInt("cups", 0) + 1
-                          val garnish = GARNISHES[Random.nextInt(GARNISHES.size)]
-                          val old = prefs.getString("garnishes", "") ?: ""
-                          val updated = (old.split(",") + garnish).filter { it.isNotEmpty() }.takeLast(6).joinToString(",")
-                          prefs.edit()
-                              .putString("date", today)
-                              .putInt("cups", cups)
-                              .putLong("last_sip", System.currentTimeMillis())
-                              .putString("garnishes", updated)
-                              .putBoolean("just_reset", false)
-                              .apply()
-                          playCuteHapticsAndSound(context, isGoal = (cups == 8), isBuddySwitch = false)
-                          scheduleCuteReminder(context)
-                          scheduleMidnightWipe(context)
+                  Random rnd = new Random();
+                  if (ACTION_DRINK.equals(action)) {
+                      int cups = prefs.getInt("cups", 0) + 1;
+                      String g = GARNISHES[rnd.nextInt(GARNISHES.length)];
+                      String old = prefs.getString("garnishes", "");
+                      String combined = old.isEmpty() ? g : old + "," + g;
+                      String[] parts = combined.split(",");
+                      StringBuilder sb = new StringBuilder();
+                      int start = Math.max(0, parts.length - 6);
+                      for (int i = start; i < parts.length; i++) {
+                          if (sb.length() > 0) sb.append(",");
+                          sb.append(parts[i]);
                       }
-                      ACTION_SWITCH_BUDDY -> {
-                          val nextBuddy = (prefs.getInt("buddy_idx", 0) + 1) % BUDDIES.size
-                          prefs.edit().putInt("buddy_idx", nextBuddy).apply()
-                          playCuteHapticsAndSound(context, isGoal = false, isBuddySwitch = true)
-                      }
-                      ACTION_REMIND -> showCuteNotification(context)
+                      prefs.edit()
+                          .putString("date", today)
+                          .putInt("cups", cups)
+                          .putLong("last_sip", System.currentTimeMillis())
+                          .putString("garnishes", sb.toString())
+                          .putBoolean("just_reset", false)
+                          .apply();
+                      playCuteHapticsAndSound(context, cups == 8, false);
+                      scheduleCuteReminder(context);
+                      scheduleMidnightWipe(context);
+                  } else if (ACTION_SWITCH_BUDDY.equals(action)) {
+                      int next = (prefs.getInt("buddy_idx", 0) + 1) % BUDDIES.length;
+                      prefs.edit().putInt("buddy_idx", next).apply();
+                      playCuteHapticsAndSound(context, false, true);
+                  } else if (ACTION_REMIND.equals(action)) {
+                      showCuteNotification(context);
                   }
 
-                  val manager = AppWidgetManager.getInstance(context)
-                  val ids = manager.getAppWidgetIds(ComponentName(context, WaterWidgetProvider::class.java))
-                  for (id in ids) updateWidget(context, manager, id)
+                  AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+                  int[] ids = mgr.getAppWidgetIds(new ComponentName(context, WaterWidgetProvider.class));
+                  for (int id : ids) updateWidget(context, mgr, id);
               }
 
-              private fun playCuteHapticsAndSound(context: Context, isGoal: Boolean, isBuddySwitch: Boolean) {
+              private void playCuteHapticsAndSound(Context context, boolean isGoal, boolean isBuddy) {
                   try {
-                      val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          when {
-                              isBuddySwitch -> {
-                                  vibrator.vibrate(VibrationEffect.createOneShot(25, 180))
-                              }
-                              isGoal -> {
-                                  val timings = longArrayOf(0, 45, 65, 55, 75, 130)
-                                  val amplitudes = intArrayOf(0, 170, 0, 210, 0, 255)
-                                  vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                              }
-                              else -> {
-                                  val timings = longArrayOf(0, 30, 55, 45)
-                                  val amplitudes = intArrayOf(0, 130, 0, 230)
-                                  vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                              }
+                      Vibrator vib = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+                      if (Build.VERSION.SDK_INT >= 26 && vib != null) {
+                          if (isBuddy) {
+                              vib.vibrate(VibrationEffect.createOneShot(25, 180));
+                          } else if (isGoal) {
+                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 45, 65, 55, 75, 130}, new int[]{0, 170, 0, 210, 0, 255}, -1));
+                          } else {
+                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 30, 55, 45}, new int[]{0, 130, 0, 230}, -1));
                           }
-                      } else {
-                          @Suppress("DEPRECATION")
-                          vibrator.vibrate(40)
                       }
-                  } catch (_: Exception) {}
+                  } catch (Exception ignored) {}
 
                   try {
-                      val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 75)
-                      val toneType = when {
-                          isBuddySwitch -> ToneGenerator.TONE_PROP_BEEP
-                          isGoal -> ToneGenerator.TONE_PROP_ACK
-                          else -> ToneGenerator.TONE_PROP_BEEP2
-                      }
-                      toneGen.startTone(toneType, 140)
-                      Handler(Looper.getMainLooper()).postDelayed({ toneGen.release() }, 250)
-                  } catch (_: Exception) {}
+                      final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 75);
+                      int tone = isBuddy ? ToneGenerator.TONE_PROP_BEEP : (isGoal ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_PROP_BEEP2);
+                      tg.startTone(tone, 140);
+                      new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                          public void run() { tg.release(); }
+                      }, 250);
+                  } catch (Exception ignored) {}
               }
 
-              private fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
-                  val prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE)
-                  val today = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-                  if (prefs.getString("date", "") != today) {
-                      val savedBuddy = prefs.getInt("buddy_idx", 0)
-                      prefs.edit().clear().putString("date", today).putInt("buddy_idx", savedBuddy).putBoolean("just_reset", true).apply()
+              private void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+                  SharedPreferences prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE);
+                  String today = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+                  if (!today.equals(prefs.getString("date", ""))) {
+                      int savedBuddy = prefs.getInt("buddy_idx", 0);
+                      prefs.edit().clear().putString("date", today).putInt("buddy_idx", savedBuddy).putBoolean("just_reset", true).apply();
                   }
 
-                  val cups = prefs.getInt("cups", 0)
-                  val buddy = BUDDIES[prefs.getInt("buddy_idx", 0)]
-                  val justReset = prefs.getBoolean("just_reset", false)
-                  val lastSip = prefs.getLong("last_sip", System.currentTimeMillis())
-                  val garnishes = (prefs.getString("garnishes", "") ?: "").split(",").filter { it.isNotEmpty() }
-                  val hoursSince = (System.currentTimeMillis() - lastSip) / (1000.0 * 60 * 60)
+                  int cups = prefs.getInt("cups", 0);
+                  String buddy = BUDDIES[prefs.getInt("buddy_idx", 0)];
+                  boolean justReset = prefs.getBoolean("just_reset", false);
+                  long lastSip = prefs.getLong("last_sip", System.currentTimeMillis());
+                  String gStr = prefs.getString("garnishes", "");
+                  String[] garnishes = gStr.isEmpty() ? new String[0] : gStr.split(",");
+                  double hoursSince = (System.currentTimeMillis() - lastSip) / (1000.0 * 60 * 60);
 
-                  val bmp = Bitmap.createBitmap(600, 680, Bitmap.Config.ARGB_8888)
-                  val canvas = Canvas(bmp)
-                  val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                  Bitmap bmp = Bitmap.createBitmap(600, 680, Bitmap.Config.ARGB_8888);
+                  Canvas canvas = new Canvas(bmp);
+                  Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-                  val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                  val (glowColor, timeLabel) = when (hour) {
-                      in 6..15 -> Pair(Color.argb(115, 253, 224, 71), "☀️ Drink It, Fool!")
-                      in 16..19 -> Pair(Color.argb(125, 251, 146, 60), "🌅 Drink It, Fool!")
-                      else -> Pair(Color.argb(130, 129, 140, 248), "🌙 Drink It, Fool!")
+                  int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+                  int glowColor;
+                  String timeLabel;
+                  if (hour >= 6 && hour <= 15) {
+                      glowColor = Color.argb(115, 253, 224, 71);
+                      timeLabel = "☀️ Drink It, Fool!";
+                  } else if (hour >= 16 && hour <= 19) {
+                      glowColor = Color.argb(125, 251, 146, 60);
+                      timeLabel = "🌅 Drink It, Fool!";
+                  } else {
+                      glowColor = Color.argb(130, 129, 140, 248);
+                      timeLabel = "🌙 Drink It, Fool!";
                   }
-                  paint.shader = RadialGradient(300f, 340f, 290f, glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-                  canvas.drawCircle(300f, 340f, 290f, paint)
-                  paint.shader = null
 
-                  paint.color = Color.argb(185, 15, 23, 42)
-                  canvas.drawRoundRect(RectF(40f, 30f, 560f, 650f), 80f, 80f, paint)
-                  paint.style = Paint.Style.STROKE
-                  paint.strokeWidth = 3f
-                  paint.color = Color.argb(90, 255, 255, 255)
-                  canvas.drawRoundRect(RectF(40f, 30f, 560f, 650f), 80f, 80f, paint)
-                  paint.style = Paint.Style.FILL
+                  paint.setShader(new RadialGradient(300f, 340f, 290f, glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                  canvas.drawCircle(300f, 340f, 290f, paint);
+                  paint.setShader(null);
 
-                  paint.color = Color.argb(55, 255, 255, 255)
-                  canvas.drawRoundRect(RectF(175f, 58f, 425f, 102f), 30f, 30f, paint)
-                  paint.color = Color.WHITE
-                  paint.textSize = 24f
-                  paint.textAlign = Paint.Align.CENTER
-                  canvas.drawText(timeLabel, 300f, 88f, paint)
-                  canvas.drawText("🔄$buddy", 495f, 88f, paint)
+                  paint.setColor(Color.argb(185, 15, 23, 42));
+                  canvas.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, paint);
+                  paint.setStyle(Paint.Style.STROKE);
+                  paint.setStrokeWidth(3f);
+                  paint.setColor(Color.argb(90, 255, 255, 255));
+                  canvas.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, paint);
+                  paint.setStyle(Paint.Style.FILL);
 
-                  val glassRect = RectF(165f, 135f, 435f, 495f)
-                  val fillRatio = (cups.coerceAtMost(8) / 8f)
-                  val waterTop = glassRect.bottom - (glassRect.height() * 0.86f * fillRatio)
+                  paint.setColor(Color.argb(55, 255, 255, 255));
+                  canvas.drawRoundRect(new RectF(175f, 58f, 425f, 102f), 30f, 30f, paint);
+                  paint.setColor(Color.WHITE);
+                  paint.setTextSize(24f);
+                  paint.setTextAlign(Paint.Align.CENTER);
+                  canvas.drawText(timeLabel, 300f, 88f, paint);
+                  canvas.drawText("🔄" + buddy, 495f, 88f, paint);
 
-                  paint.shader = LinearGradient(glassRect.left, 0f, glassRect.right, 0f,
-                      Color.argb(65, 255, 255, 255), Color.argb(20, 255, 255, 255), Shader.TileMode.CLAMP)
-                  canvas.drawRoundRect(glassRect, 55f, 55f, paint)
-                  paint.shader = null
+                  RectF glassRect = new RectF(165f, 135f, 435f, 495f);
+                  float fillRatio = Math.min(cups, 8) / 8f;
+                  float waterTop = glassRect.bottom - (glassRect.height() * 0.86f * fillRatio);
+
+                  paint.setShader(new LinearGradient(glassRect.left, 0f, glassRect.right, 0f,
+                      Color.argb(65, 255, 255, 255), Color.argb(20, 255, 255, 255), Shader.TileMode.CLAMP));
+                  canvas.drawRoundRect(glassRect, 55f, 55f, paint);
+                  paint.setShader(null);
 
                   if (cups > 0) {
-                      canvas.save()
-                      val clipPath = Path().apply { addRoundRect(glassRect, 55f, 55f, Path.Direction.CW) }
-                      canvas.clipPath(clipPath)
-                      paint.shader = LinearGradient(0f, waterTop, 0f, glassRect.bottom,
-                          Color.parseColor("#38BDF8"), Color.parseColor("#0284C7"), Shader.TileMode.CLAMP)
-                      canvas.drawRect(glassRect.left, waterTop, glassRect.right, glassRect.bottom, paint)
-                      paint.shader = null
+                      canvas.save();
+                      Path clipPath = new Path();
+                      clipPath.addRoundRect(glassRect, 55f, 55f, Path.Direction.CW);
+                      canvas.clipPath(clipPath);
+                      paint.setShader(new LinearGradient(0f, waterTop, 0f, glassRect.bottom,
+                          Color.parseColor("#38BDF8"), Color.parseColor("#0284C7"), Shader.TileMode.CLAMP));
+                      canvas.drawRect(glassRect.left, waterTop, glassRect.right, glassRect.bottom, paint);
+                      paint.setShader(null);
 
-                      paint.color = Color.argb(140, 186, 230, 253)
-                      canvas.drawOval(RectF(glassRect.left + 6f, waterTop - 12f, glassRect.right - 6f, waterTop + 12f), paint)
+                      paint.setColor(Color.argb(140, 186, 230, 253));
+                      canvas.drawOval(new RectF(glassRect.left + 6f, waterTop - 12f, glassRect.right - 6f, waterTop + 12f), paint);
 
-                      paint.textSize = 40f
-                      garnishes.forEachIndexed { i, g ->
-                          val gx = glassRect.left + 45f + ((i * 52) % 175)
-                          val gy = (waterTop + 55f + ((i * 42) % 160)).coerceAtMost(glassRect.bottom - 28f)
-                          canvas.drawText(g, gx, gy, paint)
+                      paint.setTextSize(40f);
+                      for (int i = 0; i < garnishes.length; i++) {
+                          float gx = glassRect.left + 45f + ((i * 52) % 175);
+                          float gy = Math.min(waterTop + 55f + ((i * 42) % 160), glassRect.bottom - 28f);
+                          canvas.drawText(garnishes[i], gx, gy, paint);
                       }
-                      canvas.restore()
+                      canvas.restore();
                   }
 
-                  paint.textSize = 58f
-                  val buddyY = if (cups == 0) glassRect.bottom - 22f else waterTop - 6f
-                  canvas.drawText(buddy, 300f, buddyY, paint)
+                  paint.setTextSize(58f);
+                  float buddyY = (cups == 0) ? (glassRect.bottom - 22f) : (waterTop - 6f);
+                  canvas.drawText(buddy, 300f, buddyY, paint);
 
-                  paint.style = Paint.Style.STROKE
-                  paint.strokeWidth = 7f
-                  paint.color = Color.argb(190, 255, 255, 255)
-                  canvas.drawRoundRect(glassRect, 55f, 55f, paint)
-                  paint.style = Paint.Style.FILL
-                  paint.color = Color.argb(110, 255, 255, 255)
-                  canvas.drawRoundRect(RectF(186f, 165f, 206f, 440f), 14f, 14f, paint)
-                  paint.color = Color.argb(60, 255, 255, 255)
-                  canvas.drawRoundRect(RectF(402f, 185f, 412f, 430f), 8f, 8f, paint)
+                  paint.setStyle(Paint.Style.STROKE);
+                  paint.setStrokeWidth(7f);
+                  paint.setColor(Color.argb(190, 255, 255, 255));
+                  canvas.drawRoundRect(glassRect, 55f, 55f, paint);
+                  paint.setStyle(Paint.Style.FILL);
+                  paint.setColor(Color.argb(110, 255, 255, 255));
+                  canvas.drawRoundRect(new RectF(186f, 165f, 206f, 440f), 14f, 14f, paint);
+                  paint.setColor(Color.argb(60, 255, 255, 255));
+                  canvas.drawRoundRect(new RectF(402f, 185f, 412f, 430f), 8f, 8f, paint);
 
-                  paint.color = Color.WHITE
-                  paint.textSize = 36f
-                  paint.setShadowLayer(8f, 0f, 4f, Color.argb(140, 0, 0, 0))
-                  val face = when {
-                      justReset && cups == 0 -> "( ✧ ∇ ✧ ) 🫧"
-                      cups >= 8 -> "( ★ ω ★ ) 🎉"
-                      cups == 0 -> "( ◕ ‿ ◕ ) 💧"
-                      hoursSince >= 2.5 -> "( ；´Д｀) 💦"
-                      else -> "( ≧ ◡ ≦ ) ✨"
-                  }
-                  canvas.drawText(face, 300f, 305f, paint)
-                  paint.clearShadowLayer()
+                  paint.setColor(Color.WHITE);
+                  paint.setTextSize(36f);
+                  paint.setShadowLayer(8f, 0f, 4f, Color.argb(140, 0, 0, 0));
+                  String face;
+                  if (justReset && cups == 0) face = "( ✧ ∇ ✧ ) 🫧";
+                  else if (cups >= 8) face = "( ★ ω ★ ) 🎉";
+                  else if (cups == 0) face = "( ◕ ‿ ◕ ) 💧";
+                  else if (hoursSince >= 2.5) face = "( ；´Д｀) 💦";
+                  else face = "( ≧ ◡ ≦ ) ✨";
+                  canvas.drawText(face, 300f, 305f, paint);
+                  paint.clearShadowLayer();
 
-                  paint.textSize = 44f
-                  paint.typeface = Typeface.DEFAULT_BOLD
-                  canvas.drawText("$cups / 8 Sips", 300f, 565f, paint)
-                  paint.textSize = 22f
-                  paint.typeface = Typeface.DEFAULT
-                  paint.color = Color.parseColor("#94A3B8")
-                  val subText = when {
-                      justReset && cups == 0 -> "12:00 AM Sparkle Reset! Drink It, Fool!"
-                      cups >= 8 -> "Hydration Goal Crushed, Fool! 🎉"
-                      else -> "Tap glass to sip • Wipes at 12:00 AM"
-                  }
-                  canvas.drawText(subText, 300f, 605f, paint)
+                  paint.setTextSize(44f);
+                  paint.setTypeface(Typeface.DEFAULT_BOLD);
+                  canvas.drawText(cups + " / 8 Sips", 300f, 565f, paint);
+                  paint.setTextSize(22f);
+                  paint.setTypeface(Typeface.DEFAULT);
+                  paint.setColor(Color.parseColor("#94A3B8"));
+                  String subText;
+                  if (justReset && cups == 0) subText = "12:00 AM Sparkle Reset! Drink It, Fool!";
+                  else if (cups >= 8) subText = "Hydration Goal Crushed, Fool! 🎉";
+                  else subText = "Tap glass to sip • Wipes at 12:00 AM";
+                  canvas.drawText(subText, 300f, 605f, paint);
 
-                  val views = RemoteViews(context.packageName, R.layout.widget_layout)
-                  views.setImageViewBitmap(R.id.widget_image, bmp)
+                  RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
+                  views.setImageViewBitmap(R.id.widget_image, bmp);
 
-                  val tapIntent = Intent(context, WaterWidgetProvider::class.java).apply { action = ACTION_DRINK }
-                  val pendingTap = PendingIntent.getBroadcast(context, 0, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  Intent tapIntent = new Intent(context, WaterWidgetProvider.class);
+                  tapIntent.setAction(ACTION_DRINK);
+                  PendingIntent pendingTap = PendingIntent.getBroadcast(context, 0, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                  views.setOnClickPendingIntent(R.id.widget_image, pendingTap);
+
+                  Intent buddyIntent = new Intent(context, WaterWidgetProvider.class);
+        

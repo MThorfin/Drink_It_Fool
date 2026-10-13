@@ -1,30 +1,21 @@
 name: Build Drink It Fool APK
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
+on: [push, workflow_dispatch]
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Compile APK Directly with Android SDK Tools
-        shell: python3 {0}
+      - name: Build APK
         run: |
+          python3 -c '
           import os, glob, subprocess
 
           sdk = os.environ.get("ANDROID_HOME") or "/usr/local/lib/android/sdk"
-          build_tools = sorted(glob.glob(f"{sdk}/build-tools/*"))[-1]
-          platform_jar = sorted(glob.glob(f"{sdk}/platforms/android-*/android.jar"))[-1]
-          print("Using Build Tools:", build_tools)
-          print("Using Platform:", platform_jar)
+          bt = sorted(glob.glob(sdk + "/build-tools/*"))[-1]
+          jar = sorted(glob.glob(sdk + "/platforms/android-*/android.jar"))[-1]
 
           os.makedirs("src/com/cute/waterwidget", exist_ok=True)
           os.makedirs("res/layout", exist_ok=True)
@@ -33,69 +24,39 @@ jobs:
           os.makedirs("build/obj", exist_ok=True)
           os.makedirs("build/apk", exist_ok=True)
 
-          manifest = """<?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.cute.waterwidget"
-              android:versionCode="1"
-              android:versionName="1.0">
-              <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.VIBRATE"/>
-              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-              <application
-                  android:label="Drink It, Fool!"
-                  android:icon="@android:drawable/ic_menu_compass"
-                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-                  <receiver android:name=".WaterWidgetProvider" android:exported="true" android:label="Drink It, Fool! 3D Glass">
-                      <intent-filter>
-                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-                          <action android:name="com.cute.waterwidget.ACTION_DRINK"/>
-                          <action android:name="com.cute.waterwidget.ACTION_SWITCH_BUDDY"/>
-                          <action android:name="com.cute.waterwidget.ACTION_REMIND"/>
-                          <action android:name="com.cute.waterwidget.ACTION_MIDNIGHT_WIPE"/>
-                      </intent-filter>
-                      <meta-data
-                          android:name="android.appwidget.provider"
-                          android:resource="@xml/widget_info"/>
-                  </receiver>
-              </application>
-          </manifest>"""
+          open("AndroidManifest.xml", "w").write("""<?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.cute.waterwidget" android:versionCode="1" android:versionName="1.0">
+          <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="33"/>
+          <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+          <uses-permission android:name="android.permission.VIBRATE"/>
+          <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+          <application android:label="Drink It, Fool!" android:icon="@android:drawable/ic_menu_compass" android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+          <activity android:name=".MainActivity" android:exported="true">
+          <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+          </activity>
+          <receiver android:name=".WaterWidgetProvider" android:exported="true" android:label="Drink It, Fool! 3D Glass">
+          <intent-filter>
+          <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+          <action android:name="com.cute.waterwidget.ACTION_DRINK"/>
+          <action android:name="com.cute.waterwidget.ACTION_SWITCH_BUDDY"/>
+          <action android:name="com.cute.waterwidget.ACTION_REMIND"/>
+          <action android:name="com.cute.waterwidget.ACTION_MIDNIGHT_WIPE"/>
+          </intent-filter>
+          <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info"/>
+          </receiver>
+          </application></manifest>""")
 
-          widget_info = """<?xml version="1.0" encoding="utf-8"?>
-          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-              android:minWidth="180dp"
-              android:minHeight="180dp"
-              android:updatePeriodMillis="1800000"
-              android:initialLayout="@layout/widget_layout"
-              android:resizeMode="horizontal|vertical"
-              android:widgetCategory="home_screen"/>"""
+          open("res/xml/widget_info.xml", "w").write("""<?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android" android:minWidth="180dp" android:minHeight="180dp" android:updatePeriodMillis="1800000" android:initialLayout="@layout/widget_layout" android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen"/>""")
 
-          widget_layout = """<?xml version="1.0" encoding="utf-8"?>
-          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:padding="4dp">
-              <ImageView
-                  android:id="@+id/widget_image"
-                  android:layout_width="match_parent"
-                  android:layout_height="match_parent"
-                  android:scaleType="fitCenter"/>
-              <Button
-                  android:id="@+id/btn_buddy"
-                  android:layout_width="80dp"
-                  android:layout_height="50dp"
-                  android:layout_alignParentTop="true"
-                  android:layout_alignParentEnd="true"
-                  android:background="@android:color/transparent"/>
-          </RelativeLayout>"""
+          open("res/layout/widget_layout.xml", "w").write("""<?xml version="1.0" encoding="utf-8"?>
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="4dp">
+          <ImageView android:id="@+id/widget_image" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitCenter"/>
+          <Button android:id="@+id/btn_buddy" android:layout_width="80dp" android:layout_height="50dp" android:layout_alignParentTop="true" android:layout_alignParentEnd="true" android:background="@android:color/transparent"/>
+          </RelativeLayout>""")
 
-          main_java = """package com.cute.waterwidget;
+          nl = chr(10)
+          open("src/com/cute/waterwidget/MainActivity.java", "w").write("""package com.cute.waterwidget;
           import android.app.Activity;
           import android.os.Build;
           import android.os.Bundle;
@@ -103,269 +64,233 @@ jobs:
           import android.widget.TextView;
           import android.view.Gravity;
           import android.graphics.Color;
-
           public class MainActivity extends Activity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  if (Build.VERSION.SDK_INT >= 33) {
-                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 101);
-                  }
-                  LinearLayout layout = new LinearLayout(this);
-                  layout.setOrientation(LinearLayout.VERTICAL);
-                  layout.setGravity(Gravity.CENTER);
-                  layout.setBackgroundColor(Color.parseColor("#0F172A"));
-                  layout.setPadding(65, 65, 65, 65);
-
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 101);
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.VERTICAL);
+                  l.setGravity(Gravity.CENTER);
+                  l.setBackgroundColor(Color.parseColor("#0F172A"));
+                  l.setPadding(60, 60, 60, 60);
                   TextView tv = new TextView(this);
-                  tv.setText("🦆 Drink It, Fool! is Ready!\\n\\n✨ Sounds & Haptics Active!\\n\\n1. Go to your Home Screen\\n2. Long-press wallpaper -> Widgets\\n3. Drag 'Drink It, Fool!' to your screen!\\n\\n• Tap the glass for a splash sound + ice clink vibration!\\n• Tap top-right corner of the widget to swap buddies!\\n• Automatically wipes at 12:00 AM!");
-                  tv.setTextSize(17f);
+                  tv.setText("🦆 Drink It, Fool! is Ready!  👉 Long-press your Home Screen -> Widgets -> Drag Drink It, Fool! to your wallpaper!");
+                  tv.setTextSize(18f);
                   tv.setTextColor(Color.WHITE);
                   tv.setGravity(Gravity.CENTER);
-                  layout.addView(tv);
-                  setContentView(layout);
+                  l.addView(tv);
+                  setContentView(l);
               }
-          }"""
+          }""")
 
-          provider_java = """package com.cute.waterwidget;
+          open("src/com/cute/waterwidget/WaterWidgetProvider.java", "w").write("""package com.cute.waterwidget;
           import android.app.*;
-          import android.appwidget.AppWidgetManager;
-          import android.appwidget.AppWidgetProvider;
+          import android.appwidget.*;
           import android.content.*;
           import android.graphics.*;
-          import android.media.AudioManager;
-          import android.media.ToneGenerator;
+          import android.media.*;
           import android.os.*;
           import android.widget.RemoteViews;
           import java.text.SimpleDateFormat;
           import java.util.*;
-
           public class WaterWidgetProvider extends AppWidgetProvider {
               public static final String ACTION_DRINK = "com.cute.waterwidget.ACTION_DRINK";
               public static final String ACTION_SWITCH_BUDDY = "com.cute.waterwidget.ACTION_SWITCH_BUDDY";
               public static final String ACTION_REMIND = "com.cute.waterwidget.ACTION_REMIND";
               public static final String ACTION_MIDNIGHT_WIPE = "com.cute.waterwidget.ACTION_MIDNIGHT_WIPE";
-
               public static final String[] BUDDIES = {"🦆", "🦎", "🐸", "🧋"};
               public static final String[] GARNISHES = {"🧊", "🍓", "🍋", "🌿", "🍊", "🍒"};
               public static final String[] REMINDERS = {
                   "Drink It, Fool! Your glass buddy is touching the bottom—take a sip! 🦆💧",
-                  "Hey fool! Your cells are begging for a splash! It's been 2.5 hours! 🫧",
+                  "Hey fool! Your cells are begging for a splash! It has been 2.5 hours! 🫧",
                   "Pouty glass alert! ( ；´Д｀) Drop an ice cube and drink some water, fool!"
               };
-
-              @Override
-              public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
-                  scheduleMidnightWipe(context);
-                  for (int id : ids) updateWidget(context, manager, id);
+              @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
+                  scheduleMidnightWipe(c);
+                  for (int id : ids) updateWidget(c, m, id);
               }
-
-              @Override
-              public void onReceive(Context context, Intent intent) {
-                  super.onReceive(context, intent);
-                  SharedPreferences prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE);
+              @Override public void onReceive(Context c, Intent intent) {
+                  super.onReceive(c, intent);
+                  SharedPreferences p = c.getSharedPreferences("Prefs", Context.MODE_PRIVATE);
                   String today = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
-                  String action = intent.getAction();
-
-                  if (!today.equals(prefs.getString("date", "")) || ACTION_MIDNIGHT_WIPE.equals(action)) {
-                      int savedBuddy = prefs.getInt("buddy_idx", 0);
-                      prefs.edit().clear()
-                          .putString("date", today)
-                          .putInt("buddy_idx", savedBuddy)
-                          .putBoolean("just_reset", true)
-                          .apply();
+                  String act = intent.getAction();
+                  if (!today.equals(p.getString("date", "")) || ACTION_MIDNIGHT_WIPE.equals(act)) {
+                      int b = p.getInt("buddy", 0);
+                      p.edit().clear().putString("date", today).putInt("buddy", b).putBoolean("reset", true).apply();
                   }
-
-                  Random rnd = new Random();
-                  if (ACTION_DRINK.equals(action)) {
-                      int cups = prefs.getInt("cups", 0) + 1;
-                      String g = GARNISHES[rnd.nextInt(GARNISHES.length)];
-                      String old = prefs.getString("garnishes", "");
-                      String combined = old.isEmpty() ? g : old + "," + g;
-                      String[] parts = combined.split(",");
+                  Random r = new Random();
+                  if (ACTION_DRINK.equals(act)) {
+                      int cups = p.getInt("cups", 0) + 1;
+                      String g = GARNISHES[r.nextInt(GARNISHES.length)];
+                      String old = p.getString("garn", "");
+                      String comb = old.isEmpty() ? g : old + "," + g;
+                      String[] pts = comb.split(",");
                       StringBuilder sb = new StringBuilder();
-                      int start = Math.max(0, parts.length - 6);
-                      for (int i = start; i < parts.length; i++) {
+                      for (int i = Math.max(0, pts.length - 6); i < pts.length; i++) {
                           if (sb.length() > 0) sb.append(",");
-                          sb.append(parts[i]);
+                          sb.append(pts[i]);
                       }
-                      prefs.edit()
-                          .putString("date", today)
-                          .putInt("cups", cups)
-                          .putLong("last_sip", System.currentTimeMillis())
-                          .putString("garnishes", sb.toString())
-                          .putBoolean("just_reset", false)
-                          .apply();
-                      playCuteHapticsAndSound(context, cups == 8, false);
-                      scheduleCuteReminder(context);
-                      scheduleMidnightWipe(context);
-                  } else if (ACTION_SWITCH_BUDDY.equals(action)) {
-                      int next = (prefs.getInt("buddy_idx", 0) + 1) % BUDDIES.length;
-                      prefs.edit().putInt("buddy_idx", next).apply();
-                      playCuteHapticsAndSound(context, false, true);
-                  } else if (ACTION_REMIND.equals(action)) {
-                      showCuteNotification(context);
+                      p.edit().putString("date", today).putInt("cups", cups).putLong("last", System.currentTimeMillis()).putString("garn", sb.toString()).putBoolean("reset", false).apply();
+                      fx(c, cups == 8, false);
+                      scheduleCuteReminder(c);
+                      scheduleMidnightWipe(c);
+                  } else if (ACTION_SWITCH_BUDDY.equals(act)) {
+                      p.edit().putInt("buddy", (p.getInt("buddy", 0) + 1) % BUDDIES.length).apply();
+                      fx(c, false, true);
+                  } else if (ACTION_REMIND.equals(act)) {
+                      notifyUser(c);
                   }
-
-                  AppWidgetManager mgr = AppWidgetManager.getInstance(context);
-                  int[] ids = mgr.getAppWidgetIds(new ComponentName(context, WaterWidgetProvider.class));
-                  for (int id : ids) updateWidget(context, mgr, id);
+                  AppWidgetManager m = AppWidgetManager.getInstance(c);
+                  int[] ids = m.getAppWidgetIds(new ComponentName(c, WaterWidgetProvider.class));
+                  for (int id : ids) updateWidget(c, m, id);
               }
-
-              private void playCuteHapticsAndSound(Context context, boolean isGoal, boolean isBuddy) {
+              private void fx(Context c, boolean goal, boolean sw) {
                   try {
-                      Vibrator vib = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-                      if (Build.VERSION.SDK_INT >= 26 && vib != null) {
-                          if (isBuddy) {
-                              vib.vibrate(VibrationEffect.createOneShot(25, 180));
-                          } else if (isGoal) {
-                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 45, 65, 55, 75, 130}, new int[]{0, 170, 0, 210, 0, 255}, -1));
-                          } else {
-                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 30, 55, 45}, new int[]{0, 130, 0, 230}, -1));
-                          }
+                      Vibrator v = (Vibrator) c.getSystemService(Context.VIBRATOR_SERVICE);
+                      if (Build.VERSION.SDK_INT >= 26 && v != null) {
+                          if (sw) v.vibrate(VibrationEffect.createOneShot(25, 180));
+                          else if (goal) v.vibrate(VibrationEffect.createWaveform(new long[]{0,45,65,55,75,130}, new int[]{0,170,0,210,0,255}, -1));
+                          else v.vibrate(VibrationEffect.createWaveform(new long[]{0,30,55,45}, new int[]{0,130,0,230}, -1));
                       }
-                  } catch (Exception ignored) {}
-
+                  } catch (Exception e) {}
                   try {
                       final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 75);
-                      int tone = isBuddy ? ToneGenerator.TONE_PROP_BEEP : (isGoal ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_PROP_BEEP2);
-                      tg.startTone(tone, 140);
-                      new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                          public void run() { tg.release(); }
-                      }, 250);
-                  } catch (Exception ignored) {}
+                      tg.startTone(sw ? ToneGenerator.TONE_PROP_BEEP : (goal ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_PROP_BEEP2), 140);
+                      new Handler(Looper.getMainLooper()).postDelayed(new Runnable() { public void run() { tg.release(); } }, 250);
+                  } catch (Exception e) {}
               }
-
-              private void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
-                  SharedPreferences prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE);
+              private void updateWidget(Context c, AppWidgetManager m, int id) {
+                  SharedPreferences p = c.getSharedPreferences("Prefs", Context.MODE_PRIVATE);
                   String today = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
-                  if (!today.equals(prefs.getString("date", ""))) {
-                      int savedBuddy = prefs.getInt("buddy_idx", 0);
-                      prefs.edit().clear().putString("date", today).putInt("buddy_idx", savedBuddy).putBoolean("just_reset", true).apply();
+                  if (!today.equals(p.getString("date", ""))) {
+                      int b = p.getInt("buddy", 0);
+                      p.edit().clear().putString("date", today).putInt("buddy", b).putBoolean("reset", true).apply();
                   }
-
-                  int cups = prefs.getInt("cups", 0);
-                  String buddy = BUDDIES[prefs.getInt("buddy_idx", 0)];
-                  boolean justReset = prefs.getBoolean("just_reset", false);
-                  long lastSip = prefs.getLong("last_sip", System.currentTimeMillis());
-                  String gStr = prefs.getString("garnishes", "");
-                  String[] garnishes = gStr.isEmpty() ? new String[0] : gStr.split(",");
-                  double hoursSince = (System.currentTimeMillis() - lastSip) / (1000.0 * 60 * 60);
+                  int cups = p.getInt("cups", 0);
+                  String buddy = BUDDIES[p.getInt("buddy", 0)];
+                  boolean reset = p.getBoolean("reset", false);
+                  double hrs = (System.currentTimeMillis() - p.getLong("last", System.currentTimeMillis())) / 3600000.0;
+                  String gStr = p.getString("garn", "");
+                  String[] garns = gStr.isEmpty() ? new String[0] : gStr.split(",");
 
                   Bitmap bmp = Bitmap.createBitmap(600, 680, Bitmap.Config.ARGB_8888);
-                  Canvas canvas = new Canvas(bmp);
-                  Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  Canvas cv = new Canvas(bmp);
+                  Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  int hr = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+                  int glow = (hr >= 6 && hr <= 15) ? Color.argb(115,253,224,71) : ((hr >= 16 && hr <= 19) ? Color.argb(125,251,146,60) : Color.argb(130,129,140,248));
+                  String lbl = (hr >= 6 && hr <= 15) ? "☀️ Drink It, Fool!" : ((hr >= 16 && hr <= 19) ? "🌅 Drink It, Fool!" : "🌙 Drink It, Fool!");
 
-                  int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-                  int glowColor;
-                  String timeLabel;
-                  if (hour >= 6 && hour <= 15) {
-                      glowColor = Color.argb(115, 253, 224, 71);
-                      timeLabel = "☀️ Drink It, Fool!";
-                  } else if (hour >= 16 && hour <= 19) {
-                      glowColor = Color.argb(125, 251, 146, 60);
-                      timeLabel = "🌅 Drink It, Fool!";
-                  } else {
-                      glowColor = Color.argb(130, 129, 140, 248);
-                      timeLabel = "🌙 Drink It, Fool!";
-                  }
+                  pt.setShader(new RadialGradient(300f, 340f, 290f, glow, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                  cv.drawCircle(300f, 340f, 290f, pt);
+                  pt.setShader(null);
 
-                  paint.setShader(new RadialGradient(300f, 340f, 290f, glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-                  canvas.drawCircle(300f, 340f, 290f, paint);
-                  paint.setShader(null);
+                  pt.setColor(Color.argb(185, 15, 23, 42));
+                  cv.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, pt);
+                  pt.setStyle(Paint.Style.STROKE);
+                  pt.setStrokeWidth(3f);
+                  pt.setColor(Color.argb(90, 255, 255, 255));
+                  cv.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, pt);
+                  pt.setStyle(Paint.Style.FILL);
 
-                  paint.setColor(Color.argb(185, 15, 23, 42));
-                  canvas.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, paint);
-                  paint.setStyle(Paint.Style.STROKE);
-                  paint.setStrokeWidth(3f);
-                  paint.setColor(Color.argb(90, 255, 255, 255));
-                  canvas.drawRoundRect(new RectF(40f, 30f, 560f, 650f), 80f, 80f, paint);
-                  paint.setStyle(Paint.Style.FILL);
+                  pt.setColor(Color.argb(55, 255, 255, 255));
+                  cv.drawRoundRect(new RectF(175f, 58f, 425f, 102f), 30f, 30f, pt);
+                  pt.setColor(Color.WHITE);
+                  pt.setTextSize(24f);
+                  pt.setTextAlign(Paint.Align.CENTER);
+                  cv.drawText(lbl, 300f, 88f, pt);
+                  cv.drawText("🔄" + buddy, 495f, 88f, pt);
 
-                  paint.setColor(Color.argb(55, 255, 255, 255));
-                  canvas.drawRoundRect(new RectF(175f, 58f, 425f, 102f), 30f, 30f, paint);
-                  paint.setColor(Color.WHITE);
-                  paint.setTextSize(24f);
-                  paint.setTextAlign(Paint.Align.CENTER);
-                  canvas.drawText(timeLabel, 300f, 88f, paint);
-                  canvas.drawText("🔄" + buddy, 495f, 88f, paint);
-
-                  RectF glassRect = new RectF(165f, 135f, 435f, 495f);
-                  float fillRatio = Math.min(cups, 8) / 8f;
-                  float waterTop = glassRect.bottom - (glassRect.height() * 0.86f * fillRatio);
-
-                  paint.setShader(new LinearGradient(glassRect.left, 0f, glassRect.right, 0f,
-                      Color.argb(65, 255, 255, 255), Color.argb(20, 255, 255, 255), Shader.TileMode.CLAMP));
-                  canvas.drawRoundRect(glassRect, 55f, 55f, paint);
-                  paint.setShader(null);
+                  RectF gr = new RectF(165f, 135f, 435f, 495f);
+                  float top = gr.bottom - (gr.height() * 0.86f * (Math.min(cups, 8) / 8f));
+                  pt.setShader(new LinearGradient(gr.left, 0f, gr.right, 0f, Color.argb(65,255,255,255), Color.argb(20,255,255,255), Shader.TileMode.CLAMP));
+                  cv.drawRoundRect(gr, 55f, 55f, pt);
+                  pt.setShader(null);
 
                   if (cups > 0) {
-                      canvas.save();
-                      Path clipPath = new Path();
-                      clipPath.addRoundRect(glassRect, 55f, 55f, Path.Direction.CW);
-                      canvas.clipPath(clipPath);
-                      paint.setShader(new LinearGradient(0f, waterTop, 0f, glassRect.bottom,
-                          Color.parseColor("#38BDF8"), Color.parseColor("#0284C7"), Shader.TileMode.CLAMP));
-                      canvas.drawRect(glassRect.left, waterTop, glassRect.right, glassRect.bottom, paint);
-                      paint.setShader(null);
-
-                      paint.setColor(Color.argb(140, 186, 230, 253));
-                      canvas.drawOval(new RectF(glassRect.left + 6f, waterTop - 12f, glassRect.right - 6f, waterTop + 12f), paint);
-
-                      paint.setTextSize(40f);
-                      for (int i = 0; i < garnishes.length; i++) {
-                          float gx = glassRect.left + 45f + ((i * 52) % 175);
-                          float gy = Math.min(waterTop + 55f + ((i * 42) % 160), glassRect.bottom - 28f);
-                          canvas.drawText(garnishes[i], gx, gy, paint);
+                      cv.save();
+                      Path cp = new Path();
+                      cp.addRoundRect(gr, 55f, 55f, Path.Direction.CW);
+                      cv.clipPath(cp);
+                      pt.setShader(new LinearGradient(0f, top, 0f, gr.bottom, Color.parseColor("#38BDF8"), Color.parseColor("#0284C7"), Shader.TileMode.CLAMP));
+                      cv.drawRect(gr.left, top, gr.right, gr.bottom, pt);
+                      pt.setShader(null);
+                      pt.setColor(Color.argb(140, 186, 230, 253));
+                      cv.drawOval(new RectF(gr.left + 6f, top - 12f, gr.right - 6f, top + 12f), pt);
+                      pt.setTextSize(40f);
+                      for (int i = 0; i < garns.length; i++) {
+                          cv.drawText(garns[i], gr.left + 45f + ((i * 52) % 175), Math.min(top + 55f + ((i * 42) % 160), gr.bottom - 28f), pt);
                       }
-                      canvas.restore();
+                      cv.restore();
                   }
+                  pt.setTextSize(58f);
+                  cv.drawText(buddy, 300f, (cups == 0) ? (gr.bottom - 22f) : (top - 6f), pt);
 
-                  paint.setTextSize(58f);
-                  float buddyY = (cups == 0) ? (glassRect.bottom - 22f) : (waterTop - 6f);
-                  canvas.drawText(buddy, 300f, buddyY, paint);
+                  pt.setStyle(Paint.Style.STROKE);
+                  pt.setStrokeWidth(7f);
+                  pt.setColor(Color.argb(190, 255, 255, 255));
+                  cv.drawRoundRect(gr, 55f, 55f, pt);
+                  pt.setStyle(Paint.Style.FILL);
+                  pt.setColor(Color.argb(110, 255, 255, 255));
+                  cv.drawRoundRect(new RectF(186f, 165f, 206f, 440f), 14f, 14f, pt);
 
-                  paint.setStyle(Paint.Style.STROKE);
-                  paint.setStrokeWidth(7f);
-                  paint.setColor(Color.argb(190, 255, 255, 255));
-                  canvas.drawRoundRect(glassRect, 55f, 55f, paint);
-                  paint.setStyle(Paint.Style.FILL);
-                  paint.setColor(Color.argb(110, 255, 255, 255));
-                  canvas.drawRoundRect(new RectF(186f, 165f, 206f, 440f), 14f, 14f, paint);
-                  paint.setColor(Color.argb(60, 255, 255, 255));
-                  canvas.drawRoundRect(new RectF(402f, 185f, 412f, 430f), 8f, 8f, paint);
+                  pt.setColor(Color.WHITE);
+                  pt.setTextSize(36f);
+                  String face = (reset && cups == 0) ? "( ✧ ∇ ✧ ) 🫧" : ((cups >= 8) ? "( ★ ω ★ ) 🎉" : ((cups == 0) ? "( ◕ ‿ ◕ ) 💧" : ((hrs >= 2.5) ? "( ；´Д｀) 💦" : "( ≧ ◡ ≦ ) ✨")));
+                  cv.drawText(face, 300f, 305f, pt);
 
-                  paint.setColor(Color.WHITE);
-                  paint.setTextSize(36f);
-                  paint.setShadowLayer(8f, 0f, 4f, Color.argb(140, 0, 0, 0));
-                  String face;
-                  if (justReset && cups == 0) face = "( ✧ ∇ ✧ ) 🫧";
-                  else if (cups >= 8) face = "( ★ ω ★ ) 🎉";
-                  else if (cups == 0) face = "( ◕ ‿ ◕ ) 💧";
-                  else if (hoursSince >= 2.5) face = "( ；´Д｀) 💦";
-                  else face = "( ≧ ◡ ≦ ) ✨";
-                  canvas.drawText(face, 300f, 305f, paint);
-                  paint.clearShadowLayer();
+                  pt.setTextSize(44f);
+                  pt.setTypeface(Typeface.DEFAULT_BOLD);
+                  cv.drawText(cups + " / 8 Sips", 300f, 565f, pt);
+                  pt.setTextSize(22f);
+                  pt.setTypeface(Typeface.DEFAULT);
+                  pt.setColor(Color.parseColor("#94A3B8"));
+                  String sub = (reset && cups == 0) ? "12:00 AM Sparkle Reset! Drink It, Fool!" : ((cups >= 8) ? "Hydration Goal Crushed, Fool! 🎉" : "Tap glass to sip • Wipes at 12:00 AM");
+                  cv.drawText(sub, 300f, 605f, pt);
 
-                  paint.setTextSize(44f);
-                  paint.setTypeface(Typeface.DEFAULT_BOLD);
-                  canvas.drawText(cups + " / 8 Sips", 300f, 565f, paint);
-                  paint.setTextSize(22f);
-                  paint.setTypeface(Typeface.DEFAULT);
-                  paint.setColor(Color.parseColor("#94A3B8"));
-                  String subText;
-                  if (justReset && cups == 0) subText = "12:00 AM Sparkle Reset! Drink It, Fool!";
-                  else if (cups >= 8) subText = "Hydration Goal Crushed, Fool! 🎉";
-                  else subText = "Tap glass to sip • Wipes at 12:00 AM";
-                  canvas.drawText(subText, 300f, 605f, paint);
+                  RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_layout);
+                  rv.setImageViewBitmap(R.id.widget_image, bmp);
+                  rv.setOnClickPendingIntent(R.id.widget_image, PendingIntent.getBroadcast(c, 0, new Intent(c, WaterWidgetProvider.class).setAction(ACTION_DRINK), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                  rv.setOnClickPendingIntent(R.id.btn_buddy, PendingIntent.getBroadcast(c, 1, new Intent(c, WaterWidgetProvider.class).setAction(ACTION_SWITCH_BUDDY), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                  m.updateAppWidget(id, rv);
+              }
+              private void scheduleCuteReminder(Context c) {
+                  try {
+                      AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+                      PendingIntent pi = PendingIntent.getBroadcast(c, 101, new Intent(c, WaterWidgetProvider.class).setAction(ACTION_REMIND), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 9000000L, pi);
+                  } catch (Exception e) {}
+              }
+              private void scheduleMidnightWipe(Context c) {
+                  try {
+                      AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+                      PendingIntent pi = PendingIntent.getBroadcast(c, 102, new Intent(c, WaterWidgetProvider.class).setAction(ACTION_MIDNIGHT_WIPE), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      Calendar cal = Calendar.getInstance();
+                      cal.add(Calendar.DAY_OF_YEAR, 1);
+                      cal.set(Calendar.HOUR_OF_DAY, 0);
+                      cal.set(Calendar.MINUTE, 0);
+                      cal.set(Calendar.SECOND, 5);
+                      am.set(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+                  } catch (Exception e) {}
+              }
+              private void notifyUser(Context c) {
+                  NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+                  if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(new NotificationChannel("ch", "Drink It Fool", NotificationManager.IMPORTANCE_HIGH));
+                  Notification.Builder b = (Build.VERSION.SDK_INT >= 26) ? new Notification.Builder(c, "ch") : new Notification.Builder(c);
+                  nm.notify(1, b.setSmallIcon(android.R.drawable.ic_popup_reminder).setContentTitle("Drink It, Fool! 🦆💧").setContentText(REMINDERS[new Random().nextInt(REMINDERS.length)]).setAutoCancel(true).build());
+              }
+          }""")
 
-                  RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
-                  views.setImageViewBitmap(R.id.widget_image, bmp);
-
-                  Intent tapIntent = new Intent(context, WaterWidgetProvider.class);
-                  tapIntent.setAction(ACTION_DRINK);
-                  PendingIntent pendingTap = PendingIntent.getBroadcast(context, 0, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                  views.setOnClickPendingIntent(R.id.widget_image, pendingTap);
-
-                  Intent buddyIntent = new Intent(context, WaterWidgetProvider.class);
-        
+          subprocess.run([f"{bt}/aapt2", "compile", "--dir", "res", "-o", "build/resources.zip"], check=True)
+          subprocess.run([f"{bt}/aapt2", "link", "-o", "build/apk/unsigned.apk", "-I", jar, "--manifest", "AndroidManifest.xml", "--java", "build/gen", "build/resources.zip"], check=True)
+          subprocess.run(["javac", "-source", "1.8", "-target", "1.8", "-cp", jar, "-d", "build/obj", "build/gen/com/cute/waterwidget/R.java", "src/com/cute/waterwidget/MainActivity.java", "src/com/cute/waterwidget/WaterWidgetProvider.java"], check=True)
+          classes = glob.glob("build/obj/com/cute/waterwidget/*.class")
+          subprocess.run([f"{bt}/d8", *classes, "--lib", jar, "--output", "build/apk/"], check=True)
+          subprocess.run(["zip", "-j", "-u", "build/apk/unsigned.apk", "build/apk/classes.dex"], check=True)
+          subprocess.run([f"{bt}/zipalign", "-f", "4", "build/apk/unsigned.apk", "build/apk/aligned.apk"], check=True)
+          subprocess.run(["keytool", "-genkeypair", "-v", "-keystore", "debug.keystore", "-storepass", "android", "-alias", "androiddebugkey", "-keypass", "android", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000", "-dname", "CN=Android Debug,O=Android,C=US"], check=True)
+          subprocess.run([f"{bt}/apksigner", "sign", "--ks", "debug.keystore", "--ks-pass", "pass:android", "--key-pass", "pass:android", "--out", "DrinkItFool.apk", "build/apk/aligned.apk"], check=True)
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DrinkItFool-APK
+          path: DrinkItFool.apk

@@ -1,4 +1,4 @@
-name: Build Cute 3D Glass Widget APK
+name: Build Drink It Fool APK
 
 on:
   push:
@@ -18,14 +18,19 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Generate Complete Android Widget Project & Code
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: Generate Drink It Fool Project & Compile APK
         run: |
           mkdir -p app/src/main/java/com/cute/waterwidget
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
 
           cat << 'EOF' > settings.gradle
-          rootProject.name = "CuteGlassWidget"
+          rootProject.name = "DrinkItFool"
           include ':app'
           EOF
 
@@ -78,7 +83,7 @@ jobs:
               <uses-permission android:name="android.permission.VIBRATE"/>
               <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
               <application
-                  android:label="Cute 3D Glass"
+                  android:label="Drink It, Fool!"
                   android:icon="@android:drawable/ic_menu_compass"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
                   
@@ -89,7 +94,7 @@ jobs:
                       </intent-filter>
                   </activity>
 
-                  <receiver android:name=".WaterWidgetProvider" android:exported="true">
+                  <receiver android:name=".WaterWidgetProvider" android:exported="true" android:label="Drink It, Fool! 3D Glass">
                       <intent-filter>
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
                           <action android:name="com.cute.waterwidget.ACTION_DRINK"/>
@@ -157,7 +162,7 @@ jobs:
                       setPadding(65, 65, 65, 65)
                   }
                   val tv = TextView(this).apply {
-                      text = "🦆 Cute 3D Glass Widget Installed!\n\n✨ Sounds & Haptics Active!\n\n1. Go to your Home Screen\n2. Long-press your wallpaper -> Widgets\n3. Drag 'Cute 3D Glass' to your screen!\n\n• Tap the glass for a splash sound + ice clink vibration!\n• Tap the top-right corner of the widget to swap buddies (Duck 🦆, Axolotl 🦎, Frog 🐸, Boba 🧋)!\n• Automatically resets at 12:00 AM!"
+                      text = "🦆 Drink It, Fool! is Ready!\n\n✨ Sounds & Haptics Active!\n\n1. Go to your Home Screen\n2. Long-press your wallpaper -> Widgets\n3. Drag 'Drink It, Fool!' to your screen!\n\n• Tap the glass for a splash sound + ice clink vibration!\n• Tap the top-right corner of the widget to swap buddies (Duck 🦆, Axolotl 🦎, Frog 🐸, Boba 🧋)!\n• Automatically wipes at 12:00 AM!"
                       textSize = 17f
                       setTextColor(Color.WHITE)
                       gravity = Gravity.CENTER
@@ -194,9 +199,9 @@ jobs:
                   val BUDDIES = listOf("🦆", "🦎", "🐸", "🧋")
                   val GARNISHES = listOf("🧊", "🍓", "🍋", "🌿", "🍊", "🍒")
                   val REMINDERS = listOf(
-                      "Blip blop! Your glass buddy is getting low—time for a cute sip! 💧✨",
-                      "Your cells are requesting a splash! It's been 2.5 hours! 🫧",
-                      "Pouty glass alert! ( ；´Д｀) Drop an ice cube and drink some water!"
+                      "Drink It, Fool! Your glass buddy is touching the bottom—take a sip! 🦆💧",
+                      "Hey fool! Your cells are begging for a splash! It's been 2.5 hours! 🫧",
+                      "Pouty glass alert! ( ；´Д｀) Drop an ice cube and drink some water, fool!"
                   )
               }
 
@@ -210,7 +215,6 @@ jobs:
                   val prefs = context.getSharedPreferences("CuteGlassPrefs", Context.MODE_PRIVATE)
                   val today = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
 
-                  // Check if date changed or 12:00 AM alarm triggered
                   if (prefs.getString("date", "") != today || intent.action == ACTION_MIDNIGHT_WIPE) {
                       val savedBuddy = prefs.getInt("buddy_idx", 0)
                       prefs.edit().clear()
@@ -259,13 +263,11 @@ jobs:
                                   vibrator.vibrate(VibrationEffect.createOneShot(25, 180))
                               }
                               isGoal -> {
-                                  // Celebratory 3-pulse buzz for hitting 8 glasses!
                                   val timings = longArrayOf(0, 45, 65, 55, 75, 130)
                                   val amplitudes = intArrayOf(0, 170, 0, 210, 0, 255)
                                   vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
                               }
                               else -> {
-                                  // Double-pulse: Water splash + crisp ice clink
                                   val timings = longArrayOf(0, 30, 55, 45)
                                   val amplitudes = intArrayOf(0, 130, 0, 230)
                                   vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
@@ -277,7 +279,6 @@ jobs:
                       }
                   } catch (_: Exception) {}
 
-                  // Synthesized Cute Bubble-Pop / Chime Sound
                   try {
                       val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 75)
                       val toneType = when {
@@ -309,18 +310,16 @@ jobs:
                   val canvas = Canvas(bmp)
                   val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-                  // 1. Time-of-Day Ambient Lighting Glow
                   val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                   val (glowColor, timeLabel) = when (hour) {
-                      in 6..15 -> Pair(Color.argb(115, 253, 224, 71), "☀️ Sunny Glow")
-                      in 16..19 -> Pair(Color.argb(125, 251, 146, 60), "🌅 Golden Hour")
-                      else -> Pair(Color.argb(130, 129, 140, 248), "🌙 Midnight Glow")
+                      in 6..15 -> Pair(Color.argb(115, 253, 224, 71), "☀️ Drink It, Fool!")
+                      in 16..19 -> Pair(Color.argb(125, 251, 146, 60), "🌅 Drink It, Fool!")
+                      else -> Pair(Color.argb(130, 129, 140, 248), "🌙 Drink It, Fool!")
                   }
                   paint.shader = RadialGradient(300f, 340f, 290f, glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP)
                   canvas.drawCircle(300f, 340f, 290f, paint)
                   paint.shader = null
 
-                  // 2. Frosted 3D Glass Card Base
                   paint.color = Color.argb(185, 15, 23, 42)
                   canvas.drawRoundRect(RectF(40f, 30f, 560f, 650f), 80f, 80f, paint)
                   paint.style = Paint.Style.STROKE
@@ -329,16 +328,14 @@ jobs:
                   canvas.drawRoundRect(RectF(40f, 30f, 560f, 650f), 80f, 80f, paint)
                   paint.style = Paint.Style.FILL
 
-                  // Header & Buddy Switch Pill
                   paint.color = Color.argb(55, 255, 255, 255)
-                  canvas.drawRoundRect(RectF(190f, 58f, 410f, 102f), 30f, 30f, paint)
+                  canvas.drawRoundRect(RectF(175f, 58f, 425f, 102f), 30f, 30f, paint)
                   paint.color = Color.WHITE
                   paint.textSize = 24f
                   paint.textAlign = Paint.Align.CENTER
                   canvas.drawText(timeLabel, 300f, 88f, paint)
                   canvas.drawText("🔄$buddy", 495f, 88f, paint)
 
-                  // 3. 3D Cup Dimensions & Rising Water
                   val glassRect = RectF(165f, 135f, 435f, 495f)
                   val fillRatio = (cups.coerceAtMost(8) / 8f)
                   val waterTop = glassRect.bottom - (glassRect.height() * 0.86f * fillRatio)
@@ -357,11 +354,9 @@ jobs:
                       canvas.drawRect(glassRect.left, waterTop, glassRect.right, glassRect.bottom, paint)
                       paint.shader = null
 
-                      // 3D Water Meniscus Surface Ring
                       paint.color = Color.argb(140, 186, 230, 253)
                       canvas.drawOval(RectF(glassRect.left + 6f, waterTop - 12f, glassRect.right - 6f, waterTop + 12f), paint)
 
-                      // Floating Fruit & Ice Garnishes
                       paint.textSize = 40f
                       garnishes.forEachIndexed { i, g ->
                           val gx = glassRect.left + 45f + ((i * 52) % 175)
@@ -371,12 +366,10 @@ jobs:
                       canvas.restore()
                   }
 
-                  // 4. Floating Glass Buddy
                   paint.textSize = 58f
                   val buddyY = if (cups == 0) glassRect.bottom - 22f else waterTop - 6f
                   canvas.drawText(buddy, 300f, buddyY, paint)
 
-                  // 5. 3D Specular Glass Highlights & Rim
                   paint.style = Paint.Style.STROKE
                   paint.strokeWidth = 7f
                   paint.color = Color.argb(190, 255, 255, 255)
@@ -387,7 +380,6 @@ jobs:
                   paint.color = Color.argb(60, 255, 255, 255)
                   canvas.drawRoundRect(RectF(402f, 185f, 412f, 430f), 8f, 8f, paint)
 
-                  // 6. Cute Expressive Glass Eyes
                   paint.color = Color.WHITE
                   paint.textSize = 36f
                   paint.setShadowLayer(8f, 0f, 4f, Color.argb(140, 0, 0, 0))
@@ -401,6 +393,17 @@ jobs:
                   canvas.drawText(face, 300f, 305f, paint)
                   paint.clearShadowLayer()
 
-                  // 7. Counter & Midnight Status
                   paint.textSize = 44f
-                  paint.typefac
+                  paint.typeface = Typeface.DEFAULT_BOLD
+                  canvas.drawText("$cups / 8 Sips", 300f, 565f, paint)
+                  paint.textSize = 22f
+                  paint.typeface = Typeface.DEFAULT
+                  paint.color = Color.parseColor("#94A3B8")
+                  val subText = when {
+                      justReset && cups == 0 -> "12:00 AM Sparkle Reset! Drink It, Fool!"
+                      cups >= 8 -> "Hydration Goal Crushed, Fool! 🎉"
+                      else -> "Tap glass to sip • Wipes at 12:00 AM"
+                  }
+                  canvas.drawText(subText, 300f, 605f, paint)
+
+                  val views = RemoteViews(context.packag

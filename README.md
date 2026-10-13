@@ -1,0 +1,2 @@
+# Drink_It_Fool
+Drink It, Fool! is a playful, ad-free 3D glassmorphic Android widget that lovingly bullies you into staying hydrated—featuring floating companions, fruit infusions, crisp ice-clink haptics, and an automatic 12:00 AM midnight memory wipe.
